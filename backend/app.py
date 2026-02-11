@@ -27,6 +27,9 @@ from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3
 
 # ──── Import optionnel de flask-socketio ──────
 try:
@@ -56,9 +59,44 @@ logging.basicConfig(
 logger = logging.getLogger("kvm-supervisor")
 
 # ──────────────────────────────────────────────
-# Initialisation Flask
+# Initialisation Flask & JWT
 # ──────────────────────────────────────────────
 app = Flask(__name__)
+
+# Configuration JWT
+from datetime import timedelta
+app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "super-secret-key-change-me")
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
+jwt = JWTManager(app)
+
+# ── Base de donnéesAuth (SQLite) ──────────────
+DB_NAME = "kvm_auth.db"
+
+def init_db():
+    """Initialise la base de données utilisateurs."""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS users
+                     (username TEXT PRIMARY KEY, password_hash TEXT)''')
+        
+        # Vérifier si admin existe
+        c.execute("SELECT * FROM users WHERE username='admin'")
+        if not c.fetchone():
+            # Mot de passe par défaut : admin
+            p_hash = generate_password_hash("admin")
+            c.execute("INSERT INTO users VALUES ('admin', ?)", (p_hash,))
+            logger.info("INIT: Utilisateur 'admin' créé (mdp: 'admin')")
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error("Erreur initialisation DB auth : %s", e)
+
+try:
+    init_db()
+except Exception as e:
+    logger.warning("Impossible d'initialiser la DB Auth : %s", e)
 
 # CORS : autorise toutes les origines (nécessaire pour Flutter mobile)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -138,7 +176,33 @@ def handle_internal(error):
 
 
 # ==============================================================
-#  ROUTES
+#  ROUTES AUTH
+# ==============================================================
+
+@app.route("/login", methods=["POST"])
+def login():
+    """Authentification utilisateur."""
+    username = request.json.get("username", None)
+    password = request.json.get("password", None)
+    
+    if not username or not password:
+        return jsonify({"msg": "Missing username or password"}), 400
+    
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT password_hash FROM users WHERE username=?", (username,))
+    row = c.fetchone()
+    conn.close()
+    
+    if row and check_password_hash(row[0], password):
+        access_token = create_access_token(identity=username)
+        return jsonify(access_token=access_token)
+    
+    return jsonify({"msg": "Identifiants invalides"}), 401
+
+
+# ==============================================================
+#  ROUTES API (Protégées)
 # ==============================================================
 
 # ── Racine ────────────────────────────────────
@@ -198,7 +262,9 @@ def health():
 
 
 # ── Liste des VMs ─────────────────────────────
+# ── Liste des VMs ─────────────────────────────
 @app.route("/vms", methods=["GET"])
+@jwt_required()
 def list_vms():
     """Retourne la liste de toutes les VMs avec leurs infos de base."""
     vms = manager.list_vms()
@@ -209,7 +275,9 @@ def list_vms():
 
 
 # ── Détails d'une VM ──────────────────────────
+# ── Détails d'une VM ──────────────────────────
 @app.route("/vm/<name>", methods=["GET"])
+@jwt_required()
 def vm_details(name: str):
     """Retourne les détails complets d'une VM spécifique."""
     details = manager.vm_details(name)
@@ -217,7 +285,9 @@ def vm_details(name: str):
 
 
 # ── Métriques temps réel d'une VM ─────────────
+# ── Métriques temps réel d'une VM ─────────────
 @app.route("/vm/<name>/metrics", methods=["GET"])
+@jwt_required()
 def vm_metrics(name: str):
     """
     Retourne les métriques en temps réel d'une VM :
@@ -228,7 +298,9 @@ def vm_metrics(name: str):
 
 
 # ── Démarrer une VM ───────────────────────────
+# ── Démarrer une VM ───────────────────────────
 @app.route("/vm/<name>/start", methods=["POST"])
+@jwt_required()
 def start_vm(name: str):
     """Démarre la VM spécifiée."""
     result = manager.start_vm(name)
@@ -236,7 +308,9 @@ def start_vm(name: str):
 
 
 # ── Arrêter une VM ────────────────────────────
+# ── Arrêter une VM ────────────────────────────
 @app.route("/vm/<name>/stop", methods=["POST"])
+@jwt_required()
 def stop_vm(name: str):
     """
     Arrête la VM spécifiée.
@@ -250,7 +324,9 @@ def stop_vm(name: str):
 
 
 # ── Redémarrer une VM ─────────────────────────
+# ── Redémarrer une VM ─────────────────────────
 @app.route("/vm/<name>/restart", methods=["POST"])
+@jwt_required()
 def restart_vm(name: str):
     """Redémarre (reboot) la VM spécifiée."""
     result = manager.restart_vm(name)
@@ -258,7 +334,9 @@ def restart_vm(name: str):
 
 
 # ── Stats globales (dashboard) ────────────────
+# ── Stats globales (dashboard) ────────────────
 @app.route("/stats/summary", methods=["GET"])
+@jwt_required()
 def stats_summary():
     """
     Retourne un résumé global : infos hôte, nombre de VMs,
@@ -271,6 +349,7 @@ def stats_summary():
 # ── SNAPSHOTS ─────────────────────────────────
 
 @app.route("/vm/<name>/snapshots", methods=["GET"])
+@jwt_required()
 def list_snapshots(name):
     """Liste tous les snapshots d'une VM."""
     snapshots = manager.list_snapshots(name)
@@ -278,6 +357,7 @@ def list_snapshots(name):
 
 
 @app.route("/vm/<name>/snapshots", methods=["POST"])
+@jwt_required()
 def create_snapshot(name):
     """Crée un nouveau snapshot."""
     body = request.get_json(silent=True) or {}
@@ -292,6 +372,7 @@ def create_snapshot(name):
 
 
 @app.route("/vm/<name>/snapshots/<snapshot_name>/revert", methods=["POST"])
+@jwt_required()
 def revert_snapshot(name, snapshot_name):
     """Restaure la VM à l'état du snapshot."""
     result = manager.revert_snapshot(name, snapshot_name)
@@ -299,6 +380,7 @@ def revert_snapshot(name, snapshot_name):
 
 
 @app.route("/vm/<name>/snapshots/<snapshot_name>", methods=["DELETE"])
+@jwt_required()
 def delete_snapshot(name, snapshot_name):
     """Supprime un snapshot."""
     result = manager.delete_snapshot(name, snapshot_name)
@@ -308,6 +390,7 @@ def delete_snapshot(name, snapshot_name):
 # ── RESSOURCES ────────────────────────────────
 
 @app.route("/vm/<name>/resources", methods=["POST"])
+@jwt_required()
 def update_resources(name):
     """Met à jour les ressources (vCPUs, RAM) de la VM."""
     body = request.get_json(silent=True) or {}

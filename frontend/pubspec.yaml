@@ -25,6 +25,7 @@ dependencies:
 
   # Stockage local (pour sauvegarder l'IP du backend)
   shared_preferences: ^2.3.4
+  flutter_secure_storage: ^9.0.0
 
   # Animations
   flutter_animate: ^4.5.2

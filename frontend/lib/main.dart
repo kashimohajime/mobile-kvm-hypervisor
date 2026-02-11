@@ -11,10 +11,13 @@ import 'package:provider/provider.dart';
 
 import 'providers/vm_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/auth_provider.dart';
+import 'services/api_service.dart';
 import 'screens/vm_list_screen.dart';
 import 'screens/vm_detail_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/login_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,12 +41,26 @@ class KvmSupervisorApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SettingsProvider()..loadSettings()),
-        ChangeNotifierProxyProvider<SettingsProvider, VmProvider>(
-          create: (_) => VmProvider(),
-          update: (_, settings, vmProvider) {
-            vmProvider!.updateApiBaseUrl(settings.apiBaseUrl);
-            return vmProvider;
+        
+        // ApiService : Singleton muté par SettingsProvider
+        ProxyProvider<SettingsProvider, ApiService>(
+          create: (_) => ApiService(baseUrl: 'http://192.168.1.100:5000'), // Default
+          update: (_, settings, apiService) {
+             apiService!.baseUrl = settings.apiBaseUrl;
+             return apiService;
           },
+        ),
+
+        // AuthProvider : Dépend de ApiService
+        ChangeNotifierProxyProvider<ApiService, AuthProvider>(
+          create: (context) => AuthProvider(context.read<ApiService>()),
+          update: (_, apiService, authProvider) => authProvider ?? AuthProvider(apiService),
+        ),
+
+        // VmProvider : Dépend de ApiService
+        ChangeNotifierProxyProvider<ApiService, VmProvider>(
+          create: (context) => VmProvider(context.read<ApiService>()),
+          update: (_, apiService, vmProvider) => vmProvider ?? VmProvider(apiService),
         ),
       ],
       child: Consumer<SettingsProvider>(
@@ -62,10 +79,22 @@ class KvmSupervisorApp extends StatelessWidget {
             themeMode: settings.themeMode,
 
             // ── Routes ───────────────────────────
-            initialRoute: '/',
+            home: Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                if (auth.isLoading) {
+                  return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()));
+                }
+                if (!auth.isAuthenticated) {
+                  return const LoginScreen();
+                }
+                return const VmListScreen();
+              },
+            ),
             onGenerateRoute: (routeSettings) {
               switch (routeSettings.name) {
                 case '/':
+                  // Redirection vers home (géré par AuthProvider) ou VmListScreen si argument
                   return _buildPageRoute(const VmListScreen());
                 case '/vm-detail':
                   final vmName = routeSettings.arguments as String;

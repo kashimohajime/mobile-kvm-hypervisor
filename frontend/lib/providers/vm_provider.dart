@@ -21,16 +21,9 @@ enum LoadingState { idle, loading, loaded, error }
 
 class VmProvider extends ChangeNotifier {
   // ── Service API ────────────────────────────
-  late ApiService _apiService;
+  final ApiService _apiService;
 
-  VmProvider() {
-    _apiService = ApiService(baseUrl: 'http://192.168.1.100:5000');
-  }
-
-  /// Met à jour l'URL de base (appelé par le proxy provider).
-  void updateApiBaseUrl(String url) {
-    _apiService.baseUrl = url;
-  }
+  VmProvider(this._apiService);
 
   // ── État : Liste des VMs ──────────────────
   List<VmModel> _vms = [];

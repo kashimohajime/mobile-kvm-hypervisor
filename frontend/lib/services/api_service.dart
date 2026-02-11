@@ -35,11 +35,19 @@ class ApiService {
   /// Nombre de tentatives en cas d'échec réseau
   final int maxRetries;
 
+  /// Token d'authentification JWT
+  String? _token;
+
   ApiService({
     required this.baseUrl,
     this.timeout = const Duration(seconds: 10),
     this.maxRetries = 2,
   });
+
+  /// Définit le token d'authentification.
+  void setToken(String? token) {
+    _token = token;
+  }
 
   // ──────────────────────────────────────────────
   // Méthode HTTP générique avec retry
@@ -48,8 +56,11 @@ class ApiService {
   /// Exécute une requête GET avec retry automatique.
   Future<dynamic> _get(String endpoint) async {
     return _requestWithRetry(() async {
+      final headers = {
+        if (_token != null) 'Authorization': 'Bearer $_token',
+      };
       final response = await http
-          .get(Uri.parse('$baseUrl$endpoint'))
+          .get(Uri.parse('$baseUrl$endpoint'), headers: headers)
           .timeout(timeout);
       return _handleResponse(response);
     });
@@ -61,10 +72,14 @@ class ApiService {
     Map<String, dynamic>? body,
   }) async {
     return _requestWithRetry(() async {
+      final headers = {
+        'Content-Type': 'application/json',
+        if (_token != null) 'Authorization': 'Bearer $_token',
+      };
       final response = await http
           .post(
             Uri.parse('$baseUrl$endpoint'),
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: body != null ? jsonEncode(body) : null,
           )
           .timeout(timeout);
@@ -75,8 +90,11 @@ class ApiService {
   /// Exécute une requête DELETE avec retry automatique.
   Future<dynamic> _delete(String endpoint) async {
     return _requestWithRetry(() async {
+      final headers = {
+        if (_token != null) 'Authorization': 'Bearer $_token',
+      };
       final response = await http
-          .delete(Uri.parse('$baseUrl$endpoint'))
+          .delete(Uri.parse('$baseUrl$endpoint'), headers: headers)
           .timeout(timeout);
       return _handleResponse(response);
     });
@@ -137,6 +155,31 @@ class ApiService {
   // ──────────────────────────────────────────────
   // Endpoints API
   // ──────────────────────────────────────────────
+
+  /// POST /login — Authentification utilisateur.
+  Future<String> login(String username, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username, 'password': password}),
+      ).timeout(timeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final token = data['access_token'];
+        setToken(token);
+        return token;
+      } else {
+        final body = jsonDecode(response.body);
+        throw ApiException(body['msg'] ?? 'Identifiants incorrects',
+            statusCode: response.statusCode);
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Erreur de connexion : $e');
+    }
+  }
 
   /// GET /health — Vérifie l'état de l'API.
   Future<Map<String, dynamic>> healthCheck() async {
