@@ -735,7 +735,14 @@ class _VmDetailScreenState extends State<VmDetailScreen> {
             _infoRow(
                 'Persistante', vm.isPersistent! ? 'Oui' : 'Non', theme),
           if (vm.disks.isNotEmpty)
-            _infoRow('Disques', vm.disks.join(', '), theme),
+            _infoRow(
+                'Disques',
+                vm.disks.map((d) {
+                  return d.capacityBytes > 0
+                      ? '${d.device} (${d.formattedCapacity})'
+                      : d.device;
+                }).join(', '),
+                theme),
           if (vm.networkInterfaces.isNotEmpty)
             _infoRow('Interfaces', vm.networkInterfaces.join(', '), theme),
         ],

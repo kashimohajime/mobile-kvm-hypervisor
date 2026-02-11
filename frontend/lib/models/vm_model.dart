@@ -15,7 +15,7 @@ class VmModel {
   final bool isActive;
 
   // Détails étendus (optionnels)
-  final List<String> disks;
+  final List<VmDisk> disks;
   final List<String> networkInterfaces;
   final String? osType;
   final bool? autostart;
@@ -62,7 +62,16 @@ class VmModel {
       usedMemoryMb: json['used_memory_mb'] ?? 0,
       uptimeSeconds: json['uptime_seconds'],
       isActive: json['is_active'] ?? false,
-      disks: List<String>.from(json['disks'] ?? []),
+      disks: (json['disks'] as List<dynamic>?)
+              ?.map((d) {
+                if (d is String) {
+                  // Rétrocompatibilité ou cas simple
+                  return VmDisk(device: d, capacityBytes: 0, path: '');
+                }
+                return VmDisk.fromJson(d);
+              })
+              .toList() ??
+          [],
       networkInterfaces: List<String>.from(json['network_interfaces'] ?? []),
       osType: json['os_type'],
       autostart: json['autostart'],
@@ -348,4 +357,31 @@ class VmSnapshot {
     final date = DateTime.fromMillisecondsSinceEpoch(creationTime * 1000);
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
+}
+
+/// Modèle d'un disque VM.
+class VmDisk {
+  final String device;
+  final String path;
+  final int capacityBytes;
+  final int allocationBytes;
+
+  VmDisk({
+    required this.device,
+    this.path = '',
+    this.capacityBytes = 0,
+    this.allocationBytes = 0,
+  });
+
+  factory VmDisk.fromJson(Map<String, dynamic> json) {
+    return VmDisk(
+      device: json['device'] ?? 'unknown',
+      path: json['path'] ?? '',
+      capacityBytes: json['capacity_bytes'] ?? 0,
+      allocationBytes: json['allocation_bytes'] ?? 0,
+    );
+  }
+
+  String get formattedCapacity => DiskIo.formatBytes(capacityBytes);
+  String get formattedAllocation => DiskIo.formatBytes(allocationBytes);
 }

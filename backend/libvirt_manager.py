@@ -125,6 +125,47 @@ class LibvirtManager:
                 targets.append(dev)
         return targets
 
+    def _get_disks_info(self, dom: libvirt.virDomain, conn: libvirt.virConnect) -> list[dict]:
+        """Retourne les détails des disques (device, path, capacité)."""
+        root = self._parse_xml(dom)
+        disks = []
+        for disk in root.findall(".//disk[@device='disk']"):
+            target = disk.find("target")
+            dev = target.get("dev") if target is not None else "unknown"
+
+            source = disk.find("source")
+            path = source.get("file") if source is not None else None
+
+            capacity = 0
+            allocation = 0
+
+            try:
+                # 1. Si VM active => blockInfo est fiable
+                if dom.isActive():
+                    # blockInfo retourne (capacity, allocation, physical)
+                    info = dom.blockInfo(dev)
+                    capacity = info[0]
+                    allocation = info[1]
+                
+                # 2. Si VM inactive et path connu => Lookup volume
+                elif path:
+                    vol = conn.storageVolLookupByPath(path)
+                    # info retourne (type, capacity, allocation)
+                    info = vol.info()
+                    capacity = info[1]
+                    allocation = info[2]
+            except libvirt.libvirtError:
+                # Peut échouer si le disque n'est pas dans un pool géré, etc.
+                pass
+
+            disks.append({
+                "device": dev,
+                "path": path,
+                "capacity_bytes": capacity,
+                "allocation_bytes": allocation
+            })
+        return disks
+
     @staticmethod
     def _get_network_interfaces(root: ET.Element) -> list[str]:
         """Retourne la liste des interfaces réseau (ex: vnet0)."""
@@ -212,8 +253,10 @@ class LibvirtManager:
             info = self._vm_basic_info(dom)
             root = self._parse_xml(dom)
 
-            # Ajout d'infos supplémentaires
-            info["disks"] = self._get_disk_targets(root)
+            # Ajout d'infos supplémentaires : Disques détaillés
+            info["disks"] = self._get_disks_info(dom, conn)
+            
+            # Interfaces réseau
             info["network_interfaces"] = self._get_network_interfaces(root)
 
             # OS info
@@ -228,6 +271,11 @@ class LibvirtManager:
 
             # Persistent ?
             info["is_persistent"] = dom.isPersistent() == 1
+
+            # Console VNC info (optionnel, pour debug)
+            graphics = root.find(".//graphics[@type='vnc']")
+            if graphics is not None:
+                info["vnc_port"] = graphics.get("port")
 
             logger.info("Détails récupérés pour la VM '%s'", name)
             return info
