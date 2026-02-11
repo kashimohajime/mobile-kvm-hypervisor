@@ -15,6 +15,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/vm_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/vm_card.dart';
 import '../widgets/metric_widgets.dart';
 
@@ -126,6 +127,11 @@ class _VmListScreenState extends State<VmListScreen> {
           icon: const Icon(Icons.settings_rounded),
           tooltip: 'Paramètres',
           onPressed: () => Navigator.pushNamed(context, '/settings'),
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.deepOrangeAccent),
+          tooltip: 'Déconnexion',
+          onPressed: () => _showLogoutDialog(context),
         ),
       ],
     );
@@ -496,6 +502,32 @@ class _VmListScreenState extends State<VmListScreen> {
               curve: Curves.easeInOut,
             );
       },
+    );
+  }
+
+
+  /// Affiche la boîte de dialogue de déconnexion.
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<AuthProvider>().logout();
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Se déconnecter'),
+          ),
+        ],
+      ),
     );
   }
 }
