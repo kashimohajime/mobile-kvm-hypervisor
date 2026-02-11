@@ -29,10 +29,23 @@ class _LoginScreenState extends State<LoginScreen> {
       // La navigation vers Home se fera automatiquement via l'écouteur dans main.dart
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString().replaceAll('ApiException:', '').replaceAll('Exception:', '').trim();
       setState(() {
-        // Nettoyer un peu le message d'erreur
-        _errorMessage = e.toString().replaceAll('ApiException:', '').replaceAll('Exception:', '').trim();
+        _errorMessage = msg;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text(msg)),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -45,6 +58,18 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Configuration',
+            onPressed: () => Navigator.pushNamed(context, '/settings'),
+          ),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
