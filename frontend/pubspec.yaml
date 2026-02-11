@@ -1,0 +1,47 @@
+name: flutter_kvm_app
+description: Application mobile de supervision d'hyperviseur KVM via libvirt.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Material Design icons
+  cupertino_icons: ^1.0.8
+
+  # State management
+  provider: ^6.1.2
+
+  # HTTP requests
+  http: ^1.2.2
+
+  # Graphiques
+  fl_chart: ^0.69.2
+
+  # Stockage local (pour sauvegarder l'IP du backend)
+  shared_preferences: ^2.3.4
+
+  # Animations
+  flutter_animate: ^4.5.2
+
+  # Pull-to-refresh amélioré
+  pull_to_refresh_flutter3: ^2.0.2
+
+  # Google Fonts
+  google_fonts: ^6.2.1
+
+  # Shimmer loading effect
+  shimmer: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
