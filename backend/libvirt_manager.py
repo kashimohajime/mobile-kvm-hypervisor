@@ -502,3 +502,120 @@ class LibvirtManager:
         minor = (version_int % 1_000_000) // 1_000
         patch = version_int % 1_000
         return f"{major}.{minor}.{patch}"
+
+    # ──────────────────────────────────────────
+    # SNAPSHOTS
+    # ──────────────────────────────────────────
+    def list_snapshots(self, name: str) -> list[dict]:
+        """Liste les snapshots d'une VM."""
+        conn = self._connect()
+        try:
+            dom = self._get_domain(conn, name)
+            snapshots = []
+            for snap_name in dom.snapshotListNames():
+                snap = dom.snapshotLookupByName(snap_name)
+                # Récupérer le XML pour avoir la date de création et l'état
+                snap_xml = snap.getXMLDesc()
+                root = ET.fromstring(snap_xml)
+                creation_time = root.find("creationTime")
+                state = root.find("state")
+
+                snapshots.append({
+                    "name": snap_name,
+                    "creation_time": int(creation_time.text) if creation_time is not None else 0,
+                    "state": state.text if state is not None else "unknown",
+                    "is_current": snap.isCurrent() == 1
+                })
+            # Trier par date de création, du plus récent au plus ancien
+            return sorted(snapshots, key=lambda x: x["creation_time"], reverse=True)
+        finally:
+            conn.close()
+
+    def create_snapshot(self, name: str, snapshot_name: str, description: str = "") -> dict:
+        """Crée un snapshot pour une VM."""
+        conn = self._connect()
+        try:
+            dom = self._get_domain(conn, name)
+            xml = f"<domainsnapshot><name>{snapshot_name}</name><description>{description}</description></domainsnapshot>"
+            dom.snapshotCreateXML(xml, 0)
+            logger.info("Snapshot '%s' créé pour la VM '%s'", snapshot_name, name)
+            return {"status": "created", "name": snapshot_name}
+        except libvirt.libvirtError as e:
+            logger.error("Échec création snapshot '%s' pour VM '%s' : %s", snapshot_name, name, e)
+            raise LibvirtError(f"Impossible de créer le snapshot : {e}")
+        finally:
+            conn.close()
+
+    def revert_snapshot(self, vm_name: str, snapshot_name: str) -> dict:
+        """Restaure la VM à l'état d'un snapshot."""
+        conn = self._connect()
+        try:
+            dom = self._get_domain(conn, vm_name)
+            snap = dom.snapshotLookupByName(snapshot_name)
+            # 0 = pas de flag, sinon VIR_DOMAIN_SNAPSHOT_REVERT_FORCE
+            dom.revertToSnapshot(snap, 0)
+            logger.info("VM '%s' restaurée au snapshot '%s'", vm_name, snapshot_name)
+            return {"status": "reverted", "snapshot": snapshot_name}
+        except libvirt.libvirtError as e:
+            logger.error("Échec restauration snapshot '%s' pour VM '%s' : %s", snapshot_name, vm_name, e)
+            raise LibvirtError(f"Impossible de restaurer le snapshot : {e}")
+        finally:
+            conn.close()
+
+    def delete_snapshot(self, vm_name: str, snapshot_name: str) -> dict:
+        """Supprime un snapshot."""
+        conn = self._connect()
+        try:
+            dom = self._get_domain(conn, vm_name)
+            snap = dom.snapshotLookupByName(snapshot_name)
+            snap.delete(0)
+            logger.info("Snapshot '%s' supprimé pour la VM '%s'", snapshot_name, vm_name)
+            return {"status": "deleted", "snapshot": snapshot_name}
+        except libvirt.libvirtError as e:
+            logger.error("Échec suppression snapshot '%s' pour VM '%s' : %s", snapshot_name, vm_name, e)
+            raise LibvirtError(f"Impossible de supprimer le snapshot : {e}")
+        finally:
+            conn.close()
+
+    # ──────────────────────────────────────────
+    # RESSOURCES (CPU / RAM)
+    # ──────────────────────────────────────────
+    def update_resources(self, name: str, vcpus: int, memory_mb: int) -> dict:
+        """
+        Modifie les ressources allouées (vCPU, RAM).
+        Note: Modifie la configuration persistante (prochain boot).
+        """
+        conn = self._connect()
+        try:
+            dom = self._get_domain(conn, name)
+            # Convertir MB en KiB
+            memory_kib = memory_mb * 1024
+
+            # Application sur la config persistante (VIR_DOMAIN_AFFECT_CONFIG = 2)
+            flags = libvirt.VIR_DOMAIN_AFFECT_CONFIG
+
+            # Si la VM est éteinte, on peut appliquer sur CURRENT (qui est égal à CONFIG)
+            if not dom.isActive():
+                flags = libvirt.VIR_DOMAIN_AFFECT_CURRENT
+
+            # Mise à jour de la mémoire
+            dom.setMaxMemory(memory_kib)  # Change la limite max
+            dom.setMemoryFlags(memory_kib, flags) # Change l'allocation courante
+
+            # Mise à jour des vCPUs
+            # setVcpusFlags avec AFFECT_CONFIG modifie le nombre de vCPUs au démarrage
+            dom.setVcpusFlags(vcpus, flags)
+
+            logger.info("Ressources mises à jour pour VM '%s' : %d vCPU, %d MB", name, vcpus, memory_mb)
+
+            restart_needed = dom.isActive()
+            return {
+                "status": "updated",
+                "restart_needed": restart_needed,
+                "message": "Modifications appliquées au prochain redémarrage." if restart_needed else "Modifications appliquées."
+            }
+        except libvirt.libvirtError as e:
+            logger.error("Échec maj ressources VM '%s' : %s", name, e)
+            raise LibvirtError(f"Impossible de modifier les ressources : {e}")
+        finally:
+            conn.close()

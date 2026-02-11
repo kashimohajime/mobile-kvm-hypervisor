@@ -268,6 +268,62 @@ def stats_summary():
     return jsonify(stats)
 
 
+# ── SNAPSHOTS ─────────────────────────────────
+
+@app.route("/vm/<name>/snapshots", methods=["GET"])
+def list_snapshots(name):
+    """Liste tous les snapshots d'une VM."""
+    snapshots = manager.list_snapshots(name)
+    return jsonify(snapshots)
+
+
+@app.route("/vm/<name>/snapshots", methods=["POST"])
+def create_snapshot(name):
+    """Crée un nouveau snapshot."""
+    body = request.get_json(silent=True) or {}
+    snapshot_name = body.get("name")
+    description = body.get("description", "")
+
+    if not snapshot_name:
+        return jsonify({"error": "missing_name", "message": "Le nom du snapshot est requis"}), 400
+
+    result = manager.create_snapshot(name, snapshot_name, description)
+    return jsonify(result), 201
+
+
+@app.route("/vm/<name>/snapshots/<snapshot_name>/revert", methods=["POST"])
+def revert_snapshot(name, snapshot_name):
+    """Restaure la VM à l'état du snapshot."""
+    result = manager.revert_snapshot(name, snapshot_name)
+    return jsonify(result)
+
+
+@app.route("/vm/<name>/snapshots/<snapshot_name>", methods=["DELETE"])
+def delete_snapshot(name, snapshot_name):
+    """Supprime un snapshot."""
+    result = manager.delete_snapshot(name, snapshot_name)
+    return jsonify(result)
+
+
+# ── RESSOURCES ────────────────────────────────
+
+@app.route("/vm/<name>/resources", methods=["POST"])
+def update_resources(name):
+    """Met à jour les ressources (vCPUs, RAM) de la VM."""
+    body = request.get_json(silent=True) or {}
+    vcpus = body.get("vcpus")
+    memory_mb = body.get("memory_mb")
+
+    if vcpus is None or memory_mb is None:
+        return jsonify({"error": "missing_params", "message": "vcpus et memory_mb sont requis"}), 400
+
+    try:
+        result = manager.update_resources(name, int(vcpus), int(memory_mb))
+        return jsonify(result)
+    except ValueError:
+        return jsonify({"error": "invalid_params", "message": "vcpus et memory_mb doivent être des entiers"}), 400
+
+
 # ==============================================================
 #  WEBSOCKET EVENTS (optionnel)
 # ==============================================================

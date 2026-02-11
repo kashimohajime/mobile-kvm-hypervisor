@@ -318,3 +318,34 @@ class HostInfo {
     return '$memoryTotalMb Mo';
   }
 }
+
+/// Modèle d'un snapshot de VM.
+class VmSnapshot {
+  final String name;
+  final int creationTime; // Timestamp Unix
+  final String state;
+  final bool isCurrent;
+
+  VmSnapshot({
+    required this.name,
+    required this.creationTime,
+    required this.state,
+    required this.isCurrent,
+  });
+
+  factory VmSnapshot.fromJson(Map<String, dynamic> json) {
+    return VmSnapshot(
+      name: json['name'] ?? '',
+      creationTime: json['creation_time'] ?? 0,
+      state: json['state'] ?? 'unknown',
+      isCurrent: json['is_current'] ?? false,
+    );
+  }
+
+  /// Retourne la date formatée.
+  String get formattedDate {
+    if (creationTime == 0) return '-';
+    final date = DateTime.fromMillisecondsSinceEpoch(creationTime * 1000);
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+}

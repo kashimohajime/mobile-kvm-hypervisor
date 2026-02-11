@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 import '../models/vm_model.dart';
 import '../providers/vm_provider.dart';
 import '../widgets/metric_widgets.dart';
+import 'vm_snapshots_screen.dart';
 
 class VmDetailScreen extends StatefulWidget {
   final String vmName;
@@ -209,6 +210,8 @@ class _VmDetailScreenState extends State<VmDetailScreen> {
             children: [
               // ── Actions ──────────────────────
               _buildActionButtons(vm, theme, colorScheme),
+              const SizedBox(height: 12),
+              _buildAdvancedActions(vm, context),
               const SizedBox(height: 20),
 
               // ── Jauges CPU & RAM ─────────────
@@ -349,6 +352,126 @@ class _VmDetailScreenState extends State<VmDetailScreen> {
               }
             },
             child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+  Widget _buildAdvancedActions(VmModel vm, BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => VmSnapshotsScreen(vmName: vm.name),
+              ),
+            ),
+            icon: const Icon(Icons.camera_alt_outlined),
+            label: const Text('Snapshots'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _showEditResourceDialog(vm),
+            icon: const Icon(Icons.settings_system_daydream_outlined),
+            label: const Text('Ressources'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+      ],
+    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.1);
+  }
+
+  void _showEditResourceDialog(VmModel vm) {
+    final vcpuController = TextEditingController(text: vm.vcpus.toString());
+    final ramController = TextEditingController(text: vm.memoryMb.toString());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Modifier Ressources'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Note : Les modifications de la configuration persistante s\'appliqueront au redémarrage.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: vcpuController,
+              decoration: const InputDecoration(
+                labelText: 'vCPUs',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.developer_board),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ramController,
+              decoration: const InputDecoration(
+                labelText: 'RAM (Mo)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.memory),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final vcpus = int.tryParse(vcpuController.text);
+              final ram = int.tryParse(ramController.text);
+
+              if (vcpus == null || ram == null || vcpus <= 0 || ram <= 0) {
+                return;
+              }
+
+              Navigator.pop(ctx);
+              try {
+                await context
+                    .read<VmProvider>()
+                    .updateResources(vm.name, vcpus, ram);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Ressources mises à jour avec succès'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur : $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Appliquer'),
           ),
         ],
       ),

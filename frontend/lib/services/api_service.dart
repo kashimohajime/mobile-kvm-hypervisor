@@ -46,7 +46,7 @@ class ApiService {
   // ──────────────────────────────────────────────
 
   /// Exécute une requête GET avec retry automatique.
-  Future<Map<String, dynamic>> _get(String endpoint) async {
+  Future<dynamic> _get(String endpoint) async {
     return _requestWithRetry(() async {
       final response = await http
           .get(Uri.parse('$baseUrl$endpoint'))
@@ -56,7 +56,7 @@ class ApiService {
   }
 
   /// Exécute une requête POST avec retry automatique.
-  Future<Map<String, dynamic>> _post(
+  Future<dynamic> _post(
     String endpoint, {
     Map<String, dynamic>? body,
   }) async {
@@ -72,9 +72,19 @@ class ApiService {
     });
   }
 
+  /// Exécute une requête DELETE avec retry automatique.
+  Future<dynamic> _delete(String endpoint) async {
+    return _requestWithRetry(() async {
+      final response = await http
+          .delete(Uri.parse('$baseUrl$endpoint'))
+          .timeout(timeout);
+      return _handleResponse(response);
+    });
+  }
+
   /// Logique de retry : retente [maxRetries] fois en cas d'erreur réseau.
-  Future<Map<String, dynamic>> _requestWithRetry(
-    Future<Map<String, dynamic>> Function() request,
+  Future<dynamic> _requestWithRetry(
+    Future<dynamic> Function() request,
   ) async {
     int attempts = 0;
     while (true) {
@@ -106,10 +116,10 @@ class ApiService {
     }
   }
 
-  /// Traite la réponse HTTP et retourne le JSON.
-  Map<String, dynamic> _handleResponse(http.Response response) {
+  /// Traite la réponse HTTP et retourne le JSON (Map ou List).
+  dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return jsonDecode(response.body);
     }
 
     // Tenter de parser le message d'erreur du backend
@@ -130,46 +140,88 @@ class ApiService {
 
   /// GET /health — Vérifie l'état de l'API.
   Future<Map<String, dynamic>> healthCheck() async {
-    return _get('/health');
+    return await _get('/health') as Map<String, dynamic>;
   }
 
   /// GET /vms — Liste toutes les VMs.
   Future<List<VmModel>> listVms() async {
-    final data = await _get('/vms');
+    final data = await _get('/vms') as Map<String, dynamic>;
     final vmsList = data['vms'] as List<dynamic>? ?? [];
     return vmsList.map((json) => VmModel.fromJson(json)).toList();
   }
 
   /// GET /vm/<name> — Détails d'une VM spécifique.
   Future<VmModel> getVmDetails(String name) async {
-    final data = await _get('/vm/$name');
+    final data = await _get('/vm/$name') as Map<String, dynamic>;
     return VmModel.fromJson(data);
   }
 
   /// GET /vm/<name>/metrics — Métriques temps réel d'une VM.
   Future<VmMetrics> getVmMetrics(String name) async {
-    final data = await _get('/vm/$name/metrics');
+    final data = await _get('/vm/$name/metrics') as Map<String, dynamic>;
     return VmMetrics.fromJson(data);
   }
 
   /// POST /vm/<name>/start — Démarrer une VM.
   Future<Map<String, dynamic>> startVm(String name) async {
-    return _post('/vm/$name/start');
+    return await _post('/vm/$name/start') as Map<String, dynamic>;
   }
 
   /// POST /vm/<name>/stop — Arrêter une VM.
   Future<Map<String, dynamic>> stopVm(String name, {bool force = false}) async {
-    return _post('/vm/$name/stop', body: {'force': force});
+    return await _post('/vm/$name/stop', body: {'force': force})
+        as Map<String, dynamic>;
   }
 
   /// POST /vm/<name>/restart — Redémarrer une VM.
   Future<Map<String, dynamic>> restartVm(String name) async {
-    return _post('/vm/$name/restart');
+    return await _post('/vm/$name/restart') as Map<String, dynamic>;
   }
 
   /// GET /stats/summary — Statistiques globales.
   Future<HostStats> getGlobalStats() async {
-    final data = await _get('/stats/summary');
+    final data = await _get('/stats/summary') as Map<String, dynamic>;
     return HostStats.fromJson(data);
+  }
+
+  // ──────────────────────────────────────────────
+  // SNAPSHOTS
+  // ──────────────────────────────────────────────
+
+  /// GET /vm/<name>/snapshots
+  Future<List<VmSnapshot>> getSnapshots(String name) async {
+    final response = await _get('/vm/$name/snapshots');
+    return (response as List).map((e) => VmSnapshot.fromJson(e)).toList();
+  }
+
+  /// POST /vm/<name>/snapshots
+  Future<void> createSnapshot(
+      String name, String snapshotName, String description) async {
+    await _post('/vm/$name/snapshots', body: {
+      'name': snapshotName,
+      'description': description,
+    });
+  }
+
+  /// POST /vm/<name>/snapshots/<snapshotName>/revert
+  Future<void> revertSnapshot(String name, String snapshotName) async {
+    await _post('/vm/$name/snapshots/$snapshotName/revert');
+  }
+
+  /// DELETE /vm/<name>/snapshots/<snapshotName>
+  Future<void> deleteSnapshot(String name, String snapshotName) async {
+    await _delete('/vm/$name/snapshots/$snapshotName');
+  }
+
+  // ──────────────────────────────────────────────
+  // RESSOURCES
+  // ──────────────────────────────────────────────
+
+  /// POST /vm/<name>/resources
+  Future<void> updateResources(String name, int vcpus, int memoryMb) async {
+    await _post('/vm/$name/resources', body: {
+      'vcpus': vcpus,
+      'memory_mb': memoryMb,
+    });
   }
 }

@@ -274,6 +274,82 @@ class VmProvider extends ChangeNotifier {
   }
 
   // ──────────────────────────────────────────────
+  // SNAPSHOTS
+  // ──────────────────────────────────────────────
+
+  List<VmSnapshot> _snapshots = [];
+  LoadingState _snapshotsState = LoadingState.idle;
+  String? _snapshotsError;
+
+  List<VmSnapshot> get snapshots => _snapshots;
+  LoadingState get snapshotsState => _snapshotsState;
+  String? get snapshotsError => _snapshotsError;
+
+  /// Charge la liste des snapshots d'une VM.
+  Future<void> fetchSnapshots(String vmName) async {
+    _snapshotsState = LoadingState.loading;
+    _snapshotsError = null;
+    notifyListeners();
+
+    try {
+      _snapshots = await _apiService.getSnapshots(vmName);
+      _snapshotsState = LoadingState.loaded;
+    } on ApiException catch (e) {
+      _snapshotsError = e.message;
+      _snapshotsState = LoadingState.error;
+    } catch (e) {
+      _snapshotsError = 'Erreur inattendue : $e';
+      _snapshotsState = LoadingState.error;
+    }
+    notifyListeners();
+  }
+
+  /// Crée un nouveau snapshot.
+  Future<void> createSnapshot(
+      String vmName, String snapshotName, String description) async {
+    try {
+      await _apiService.createSnapshot(vmName, snapshotName, description);
+      await fetchSnapshots(vmName); // Rafraîchir la liste
+    } on ApiException catch (e) {
+      throw e.message;
+    }
+  }
+
+  /// Restaure un snapshot.
+  Future<void> revertSnapshot(String vmName, String snapshotName) async {
+    try {
+      await _apiService.revertSnapshot(vmName, snapshotName);
+      await fetchVmDetails(vmName); // L'état de la VM a pu changer
+    } on ApiException catch (e) {
+      throw e.message;
+    }
+  }
+
+  /// Supprime un snapshot.
+  Future<void> deleteSnapshot(String vmName, String snapshotName) async {
+    try {
+      await _apiService.deleteSnapshot(vmName, snapshotName);
+      await fetchSnapshots(vmName); // Rafraîchir la liste
+    } on ApiException catch (e) {
+      throw e.message;
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // RESSOURCES
+  // ──────────────────────────────────────────────
+
+  /// Met à jour les ressources CPU/RAM.
+  Future<void> updateResources(String vmName, int vcpus, int memoryMb) async {
+    try {
+      await _apiService.updateResources(vmName, vcpus, memoryMb);
+      await fetchVmDetails(vmName); // Mettre à jour les infos affichées
+    } on ApiException catch (e) {
+      throw e.message;
+    }
+  }
+
+  // ──────────────────────────────────────────────
   // Compteurs rapides
   // ──────────────────────────────────────────────
 
