@@ -164,6 +164,16 @@ Le fichier `android/app/src/main/AndroidManifest.xml` doit contenir :
 ### Emulateur Android → backend sur localhost
 Utiliser `http://10.0.2.2:5000` (l'émulateur redirige `10.0.2.2` vers l'hôte)
 
+### Le "flutter run" plante au démarrage (Android Emulator)
+Vous voyez l'erreur : `Using the Impeller rendering backend (OpenGLES)` puis l'app quitte.
+C'est un problème de compatibilité graphique avec l'émulateur.
+
+**Solution :**
+Désactivez Impeller au lancement :
+```bash
+flutter run --no-enable-impeller
+```
+
 ### Les métriques CPU montrent 0%
 C'est normal si la VM vient de démarrer. Attendez quelques secondes.
 

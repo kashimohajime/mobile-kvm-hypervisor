@@ -156,28 +156,38 @@ class ApiService {
   // Endpoints API
   // ──────────────────────────────────────────────
 
-  /// POST /login — Authentification utilisateur.
   Future<String> login(String username, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
-      ).timeout(timeout);
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'username': username, 'password': password}),
+          )
+          .timeout(timeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final token = data['access_token'];
         setToken(token);
         return token;
+      } else if (response.statusCode == 401) {
+        throw ApiException('Identifiant ou mot de passe incorrect.',
+            statusCode: 401);
       } else {
         final body = jsonDecode(response.body);
-        throw ApiException(body['msg'] ?? 'Identifiants incorrects',
+        throw ApiException(body['msg'] ?? 'Erreur serveur (${response.statusCode})',
             statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw ApiException(
+          'Serveur injoignable. Vérifiez l\'adresse IP et votre connexion WiFi.');
+    } on TimeoutException {
+      throw ApiException('Le serveur ne répond pas. Vérifiez l\'adresse IP.');
+    } on ApiException {
+      rethrow;
     } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('Erreur de connexion : $e');
+      throw ApiException('Erreur inattendue : $e');
     }
   }
 

@@ -81,7 +81,7 @@ class KvmSupervisorApp extends StatelessWidget {
             // ── Routes ───────────────────────────
             home: Consumer<AuthProvider>(
               builder: (context, auth, _) {
-                if (auth.isLoading) {
+                if (auth.isInitializing) {
                   return const Scaffold(
                       body: Center(child: CircularProgressIndicator()));
                 }

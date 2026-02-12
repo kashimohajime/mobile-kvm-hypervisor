@@ -8,10 +8,10 @@ class AuthProvider extends ChangeNotifier {
   
   bool _isAuthenticated = false;
   String? _username;
-  bool _isLoading = true;
+  bool _isInitializing = true; // Renamed from _isLoading
 
   bool get isAuthenticated => _isAuthenticated;
-  bool get isLoading => _isLoading;
+  bool get isInitializing => _isInitializing; // Renamed from isLoading
   String? get username => _username;
 
   AuthProvider(this._apiService) {
@@ -35,14 +35,13 @@ class AuthProvider extends ChangeNotifier {
       // En cas d'erreur de lecture (ex: première installation), on considère déconnecté
       _isAuthenticated = false;
     } finally {
-      _isLoading = false;
+      _isInitializing = false; // Renamed
       notifyListeners();
     }
   }
 
   Future<void> login(String username, String password) async {
-    _isLoading = true;
-    notifyListeners();
+    // No longer setting global loading state here to avoid unmounting LoginScreen
     
     try {
       final token = await _apiService.login(username, password);
@@ -52,13 +51,12 @@ class AuthProvider extends ChangeNotifier {
       
       _isAuthenticated = true;
       _username = username;
+      notifyListeners(); // Only notify on success
     } catch (e) {
       _isAuthenticated = false;
       rethrow; 
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
+    // No finally block needed here as we don't manage loading state globally anymore
   }
 
   Future<void> logout() async {
