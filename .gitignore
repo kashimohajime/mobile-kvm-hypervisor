@@ -1,0 +1,5 @@
+# Presentations
+*.pptx
+*.ppt
+~$*.pptx
+presentations/
