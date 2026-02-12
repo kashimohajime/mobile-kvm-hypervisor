@@ -269,6 +269,16 @@ class _VmListScreenState extends State<VmListScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            if (hasFilter)
+              FilledButton.icon(
+                onPressed: () {
+                  provider.setStateFilter(null);
+                  provider.setSearchQuery('');
+                },
+                icon: const Icon(Icons.filter_alt_off_rounded),
+                label: const Text('Réinitialiser les filtres'),
+              ),
+            const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: () => provider.fetchVms(),
               icon: const Icon(Icons.refresh_rounded),

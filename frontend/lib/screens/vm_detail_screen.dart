@@ -259,52 +259,72 @@ class _VmDetailScreenState extends State<VmDetailScreen> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
         // START
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.play_arrow_rounded,
-            label: 'Démarrer',
-            color: const Color(0xFF4CAF50),
-            enabled: !vm.isRunning,
-            onPressed: () => _confirmAction(
-              'Démarrer ${vm.name} ?',
-              'La VM sera démarrée.',
-              () => context.read<VmProvider>().startVm(vm.name),
-            ),
+        _ActionButton(
+          icon: Icons.play_arrow_rounded,
+          label: 'Démarrer',
+          color: const Color(0xFF4CAF50),
+          enabled: !vm.isRunning,
+          onPressed: () => _confirmAction(
+            'Démarrer ${vm.name} ?',
+            'La VM sera démarrée.',
+            () => context.read<VmProvider>().startVm(vm.name),
           ),
         ),
-        const SizedBox(width: 8),
 
-        // STOP
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.stop_rounded,
-            label: 'Arrêter',
-            color: const Color(0xFFEF5350),
-            enabled: vm.isRunning,
-            onPressed: () => _confirmAction(
-              'Arrêter ${vm.name} ?',
-              'La VM sera arrêtée proprement.',
-              () => context.read<VmProvider>().stopVm(vm.name),
-            ),
+        // STOP (gracieux)
+        _ActionButton(
+          icon: Icons.stop_rounded,
+          label: 'Arrêter',
+          color: const Color(0xFFEF5350),
+          enabled: vm.isRunning,
+          onPressed: () => _confirmAction(
+            'Arrêter ${vm.name} ?',
+            'La VM sera arrêtée proprement (ACPI shutdown).',
+            () => context.read<VmProvider>().stopVm(vm.name),
           ),
         ),
-        const SizedBox(width: 8),
+
+        // FORCE STOP (destroy)
+        _ActionButton(
+          icon: Icons.power_settings_new_rounded,
+          label: 'Forcer arrêt',
+          color: const Color(0xFFB71C1C),
+          enabled: vm.isRunning,
+          onPressed: () => _confirmAction(
+            'Arrêt forcé de ${vm.name} ?',
+            '⚠️ Arrêt brutal (destroy). Les données non sauvegardées seront perdues.',
+            () => context.read<VmProvider>().stopVm(vm.name, force: true),
+          ),
+        ),
 
         // RESTART
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.restart_alt_rounded,
-            label: 'Redémarrer',
-            color: const Color(0xFFFFA726),
-            enabled: vm.isRunning,
-            onPressed: () => _confirmAction(
-              'Redémarrer ${vm.name} ?',
-              'La VM sera redémarrée.',
-              () => context.read<VmProvider>().restartVm(vm.name),
-            ),
+        _ActionButton(
+          icon: Icons.restart_alt_rounded,
+          label: 'Redémarrer',
+          color: const Color(0xFFFFA726),
+          enabled: vm.isRunning,
+          onPressed: () => _confirmAction(
+            'Redémarrer ${vm.name} ?',
+            'La VM sera redémarrée.',
+            () => context.read<VmProvider>().restartVm(vm.name),
+          ),
+        ),
+
+        // FORCE RESTART
+        _ActionButton(
+          icon: Icons.replay_circle_filled_rounded,
+          label: 'Forcer redémarrage',
+          color: const Color(0xFFD84315), // Deep Orange 800
+          enabled: vm.isRunning,
+          onPressed: () => _confirmAction(
+            'Redémarrage forcé de ${vm.name} ?',
+            '⚠️ Reset brutal (équivalent bouton reset physique). Risque de perte de données.',
+            () => context.read<VmProvider>().restartVm(vm.name, force: true),
           ),
         ),
       ],

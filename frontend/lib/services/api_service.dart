@@ -217,8 +217,10 @@ class ApiService {
   }
 
   /// POST /vm/<name>/restart — Redémarrer une VM.
-  Future<Map<String, dynamic>> restartVm(String name) async {
-    return await _post('/vm/$name/restart') as Map<String, dynamic>;
+  Future<Map<String, dynamic>> restartVm(String name,
+      {bool force = false}) async {
+    return await _post('/vm/$name/restart', body: {'force': force})
+        as Map<String, dynamic>;
   }
 
   /// GET /stats/summary — Statistiques globales.

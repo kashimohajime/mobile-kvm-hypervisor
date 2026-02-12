@@ -331,16 +331,34 @@ class LibvirtManager:
         finally:
             conn.close()
 
-    def restart_vm(self, name: str) -> dict:
-        """Redémarre une VM (reboot gracieux si active, sinon start)."""
+    def restart_vm(self, name: str, force: bool = False) -> dict:
+        """
+        Redémarre une VM.
+        - force=False : reboot gracieux (ACPI)
+        - force=True  : reset brutal (reset physique)
+        """
         conn = self._connect()
         try:
             dom = self._get_domain(conn, name)
             if dom.isActive():
-                dom.reboot(0)
-                logger.info("VM '%s' redémarrée (reboot)", name)
-                return {"status": "restarted", "name": name,
-                        "message": f"La VM '{name}' a été redémarrée."}
+                if force:
+                    try:
+                        dom.reset(0)
+                        logger.info("VM '%s' réinitialisée (reset)", name)
+                        return {"status": "reset", "name": name,
+                                "message": f"La VM '{name}' a été réinitialisée physiquement."}
+                    except libvirt.libvirtError:
+                        # Fallback si reset n'est pas supporté (ex: certaines configs QEMU)
+                        logger.warning("Reset non supporté pour '%s', fallback sur destroy+create", name)
+                        dom.destroy()
+                        dom.create()
+                        return {"status": "restarted_hard", "name": name,
+                                "message": f"La VM '{name}' a été redémarrée de force."}
+                else:
+                    dom.reboot(0)
+                    logger.info("VM '%s' redémarrée (reboot)", name)
+                    return {"status": "restarted", "name": name,
+                            "message": f"La VM '{name}' a été redémarrée."}
             else:
                 dom.create()
                 logger.info("VM '%s' était arrêtée — démarrage", name)

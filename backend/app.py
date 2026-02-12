@@ -328,8 +328,14 @@ def stop_vm(name: str):
 @app.route("/vm/<name>/restart", methods=["POST"])
 @jwt_required()
 def restart_vm(name: str):
-    """Redémarre (reboot) la VM spécifiée."""
-    result = manager.restart_vm(name)
+    """
+    Redémarre la VM spécifiée.
+    Paramètre optionnel (JSON body) :
+        force (bool) : si true, reset brutal. Défaut : false.
+    """
+    body = request.get_json(silent=True) or {}
+    force = body.get("force", False)
+    result = manager.restart_vm(name, force=force)
     return jsonify(result)
 
 

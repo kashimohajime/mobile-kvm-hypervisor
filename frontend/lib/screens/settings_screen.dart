@@ -280,13 +280,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         children: [
           _themeOption(
-            'Système',
-            Icons.brightness_auto_rounded,
-            ThemeMode.system,
-            settings,
-            theme,
-          ),
-          _themeOption(
             'Clair',
             Icons.light_mode_rounded,
             ThemeMode.light,
@@ -344,21 +337,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SwitchListTile(
-            title: const Text('Rafraîchissement automatique'),
-            subtitle: Text(
-                'Toutes les ${settings.refreshIntervalSeconds} secondes'),
-            value: settings.autoRefresh,
-            onChanged: (value) => settings.setAutoRefresh(value),
-            contentPadding: EdgeInsets.zero,
-          ),
-          const Divider(),
-          const SizedBox(height: 8),
           Text(
-            'Intervalle : ${settings.refreshIntervalSeconds}s',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withAlpha(150),
+            'Intervalle de rafraîchissement',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '${settings.refreshIntervalSeconds} secondes',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withAlpha(200),
+              fontWeight: FontWeight.bold,
             ),
           ),
           Slider(

@@ -253,9 +253,9 @@ class VmProvider extends ChangeNotifier {
   }
 
   /// Redémarre une VM. Retourne le message du serveur.
-  Future<String> restartVm(String name) async {
+  Future<String> restartVm(String name, {bool force = false}) async {
     try {
-      final result = await _apiService.restartVm(name);
+      final result = await _apiService.restartVm(name, force: force);
       await Future.wait([
         fetchVms(silent: true),
         if (_selectedVm?.name == name) fetchVmDetails(name),
